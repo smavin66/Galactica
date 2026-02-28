@@ -5,7 +5,8 @@ export class HUD {
     ctx: CanvasRenderingContext2D,
     score: number,
     lives: number,
-    highScore: number
+    highScore: number,
+    wave = 1
   ): void {
     ctx.save();
     ctx.font = '16px "Courier New", monospace';
@@ -16,10 +17,10 @@ export class HUD {
     ctx.textAlign = 'left';
     ctx.fillText(`SCORE ${score.toString().padStart(6, '0')}`, 16, 12);
 
-    // High score (center)
+    // Wave + High score (center)
     ctx.fillStyle = '#ffcc00';
     ctx.textAlign = 'center';
-    ctx.fillText(`HI ${highScore.toString().padStart(6, '0')}`, CANVAS_W / 2, 12);
+    ctx.fillText(`W${wave}  HI ${highScore.toString().padStart(6, '0')}`, CANVAS_W / 2, 12);
 
     // Lives (right)
     ctx.textAlign = 'right';

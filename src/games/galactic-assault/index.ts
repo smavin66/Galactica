@@ -10,8 +10,9 @@ import { Player } from './Player';
 import { BulletManager } from './Bullets';
 import { AlienFormation } from './AlienFormation';
 import { PowerUpManager } from './PowerUp';
+import { MysteryShip } from './MysteryShip';
 
-type GameState = 'ready' | 'playing' | 'dying' | 'gameover' | 'victory';
+type GameState = 'ready' | 'playing' | 'dying' | 'gameover' | 'nextwave';
 
 export class GalacticAssault implements Game {
   private input = new InputManager();
@@ -25,9 +26,11 @@ export class GalacticAssault implements Game {
   private bullets = new BulletManager();
   private aliens = new AlienFormation();
   private powerUps = new PowerUpManager();
+  private mysteryShip = new MysteryShip();
 
   private score = 0;
   private highScore = 0;
+  private wave = 1;
   private state: GameState = 'ready';
   private stateTimer = 0;
   private dyingTimer = 0;
@@ -48,10 +51,23 @@ export class GalacticAssault implements Game {
   private resetGame(): void {
     this.player.reset();
     this.bullets.reset();
-    this.aliens.init();
+    this.aliens.init(1);
     this.powerUps.reset();
+    this.mysteryShip.reset();
     this.particles.clear();
     this.score = 0;
+    this.wave = 1;
+  }
+
+  private startNextWave(): void {
+    this.wave++;
+    this.bullets.reset();
+    this.aliens.init(this.wave);
+    this.powerUps.reset();
+    this.mysteryShip.reset();
+    this.particles.clear();
+    this.player.powerUp = null;
+    this.player.powerUpTimer = 0;
   }
 
   update(dt: number): void {
@@ -101,12 +117,11 @@ export class GalacticAssault implements Game {
         }
         break;
 
-      case 'victory':
+      case 'nextwave':
         this.stateTimer += dt;
-        if (this.input.justPressed('Space') && this.stateTimer > 1) {
-          this.resetGame();
-          this.state = 'ready';
-          this.stateTimer = 0;
+        if (this.stateTimer > 2) {
+          this.startNextWave();
+          this.state = 'playing';
         }
         break;
     }
@@ -136,12 +151,13 @@ export class GalacticAssault implements Game {
     this.bullets.update(dt);
     this.aliens.update(dt, this.bullets, this.player.x);
     this.powerUps.update(dt);
+    this.mysteryShip.update(dt);
 
     this.checkCollisions();
 
-    // Victory check
+    // Wave clear check
     if (this.aliens.aliveCount === 0) {
-      this.state = 'victory';
+      this.state = 'nextwave';
       this.stateTimer = 0;
       this.saveHighScore();
     }
@@ -156,6 +172,34 @@ export class GalacticAssault implements Game {
       w: pw,
       h: ph,
     };
+
+    // Player bullets vs mystery ship
+    if (this.mysteryShip.active) {
+      const shipRect = {
+        x: this.mysteryShip.x - this.mysteryShip.width / 2,
+        y: this.mysteryShip.y - this.mysteryShip.height / 2,
+        w: this.mysteryShip.width,
+        h: this.mysteryShip.height,
+      };
+      this.bullets.playerBullets.forEachActive((bullet) => {
+        const bRect = {
+          x: bullet.x - bullet.width / 2,
+          y: bullet.y - bullet.height / 2,
+          w: bullet.width,
+          h: bullet.height,
+        };
+        if (rectOverlap(bRect, shipRect)) {
+          this.bullets.playerBullets.release(bullet);
+          const pts = this.mysteryShip.hit();
+          this.score += pts;
+          if (this.score > this.highScore) this.highScore = this.score;
+          this.particles.emit(this.mysteryShip.x, this.mysteryShip.y, 25, '#ffcc44', 200, 0.5, 5);
+          this.particles.emit(this.mysteryShip.x, this.mysteryShip.y, 15, '#ffffff', 120, 0.3, 3);
+          this.audio.explosion();
+          this.shake.trigger(5, 0.2);
+        }
+      });
+    }
 
     // Player bullets vs aliens
     this.bullets.playerBullets.forEachActive((bullet) => {
@@ -177,17 +221,28 @@ export class GalacticAssault implements Game {
 
         if (rectOverlap(bulletRect, alienRect)) {
           this.bullets.playerBullets.release(bullet);
-          alien.alive = false;
-          alien.diving = false;
-          this.score += this.aliens.getPointsForAlien(alien);
-          if (this.score > this.highScore) {
-            this.highScore = this.score;
+          alien.hp--;
+          alien.hitFlash = 0.15;
+
+          if (alien.hp <= 0) {
+            // Destroyed
+            alien.alive = false;
+            alien.diving = false;
+            this.score += this.aliens.getPointsForAlien(alien);
+            if (this.score > this.highScore) {
+              this.highScore = this.score;
+            }
+            this.particles.emit(alien.x, alien.y, 15, '#ff8844', 150, 0.4, 4);
+            this.particles.emit(alien.x, alien.y, 8, '#ffcc00', 80, 0.3, 2);
+            this.audio.explosion();
+            this.shake.trigger(3, 0.15);
+            this.powerUps.spawn(alien.x, alien.y);
+          } else {
+            // Damaged but alive
+            this.particles.emit(alien.x, alien.y, 6, '#ffaa44', 60, 0.2, 2);
+            this.audio.hit();
+            this.shake.trigger(2, 0.1);
           }
-          this.particles.emit(alien.x, alien.y, 15, '#ff8844', 150, 0.4, 4);
-          this.particles.emit(alien.x, alien.y, 8, '#ffcc00', 80, 0.3, 2);
-          this.audio.explosion();
-          this.shake.trigger(3, 0.15);
-          this.powerUps.spawn(alien.x, alien.y);
           return;
         }
       }
@@ -270,12 +325,13 @@ export class GalacticAssault implements Game {
       this.player.render(ctx);
     }
     this.aliens.render(ctx);
+    this.mysteryShip.render(ctx);
     this.bullets.render(ctx);
     this.powerUps.render(ctx);
     this.particles.render(ctx);
 
     // HUD
-    this.hud.render(ctx, this.score, this.player.lives, this.highScore);
+    this.hud.render(ctx, this.score, this.player.lives, this.highScore, this.wave);
 
     // State overlays
     switch (this.state) {
@@ -285,8 +341,8 @@ export class GalacticAssault implements Game {
       case 'gameover':
         this.renderGameOver(ctx);
         break;
-      case 'victory':
-        this.renderVictory(ctx);
+      case 'nextwave':
+        this.renderNextWave(ctx);
         break;
     }
 
@@ -329,22 +385,12 @@ export class GalacticAssault implements Game {
     }
   }
 
-  private renderVictory(ctx: CanvasRenderingContext2D): void {
+  private renderNextWave(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    this.hud.drawCenteredText(ctx, 'VICTORY!', CANVAS_H / 2 - 40, 36, '#00ff88');
-    this.hud.drawCenteredText(
-      ctx,
-      `Score: ${this.score}`,
-      CANVAS_H / 2 + 10,
-      20,
-      '#ffffff'
-    );
-
-    if (this.stateTimer > 1 && Math.floor(this.stateTimer * 2) % 2 === 0) {
-      this.hud.drawCenteredText(ctx, 'Press SPACE to Play Again', CANVAS_H / 2 + 60, 16, '#ffcc00');
-    }
+    this.hud.drawCenteredText(ctx, 'WAVE CLEAR!', CANVAS_H / 2 - 40, 32, '#00ff88');
+    this.hud.drawCenteredText(ctx, `Wave ${this.wave + 1} incoming...`, CANVAS_H / 2 + 10, 18, '#ffcc00');
   }
 
   private renderPowerUpIndicator(ctx: CanvasRenderingContext2D): void {

@@ -21,6 +21,8 @@ export interface Alien {
   homeY: number;
   hitFlash: number;
   animPhase: number; // per-alien animation offset
+  hp: number;
+  maxHp: number;
 }
 
 const COLS = 8;
@@ -43,16 +45,23 @@ export class AlienFormation {
   shootInterval = 1.5;
   diveTimer = 0;
   diveInterval = 3;
+  private groupDiveChance = 0; // probability of a group dive (0-1)
 
   private formationLeft = 0;
   private formationRight = 0;
 
-  init(): void {
+  init(wave = 1): void {
     this.aliens = [];
     this.swayOffset = 0;
     this.swayDir = 1;
     this.shootTimer = 0;
     this.diveTimer = 1.5;
+
+    // Scale difficulty with wave
+    this.swaySpeed = 40 + (wave - 1) * 8;
+    this.shootInterval = Math.max(0.4, 1.5 - (wave - 1) * 0.15);
+    this.diveInterval = Math.max(1.0, 3 - (wave - 1) * 0.3);
+    this.groupDiveChance = Math.min(0.7, (wave - 1) * 0.2); // 0% wave 1, 20% wave 2, 40% wave 3...
 
     const startX = (CANVAS_W - (COLS - 1) * SPACING_X) / 2;
 
@@ -60,6 +69,11 @@ export class AlienFormation {
       for (let col = 0; col < COLS; col++) {
         const homeX = startX + col * SPACING_X;
         const homeY = FORMATION_TOP + row * SPACING_Y;
+        // Armored aliens: commanders from wave 3+, warriors from wave 6+
+        let hp = 1;
+        if (row === 0 && wave >= 3) hp = 2;
+        if (row === 1 && wave >= 6) hp = 2;
+
         this.aliens.push({
           x: homeX,
           y: homeY,
@@ -79,6 +93,8 @@ export class AlienFormation {
           homeY,
           hitFlash: 0,
           animPhase: (row * COLS + col) * 0.7,
+          hp,
+          maxHp: hp,
         });
       }
     }
@@ -217,21 +233,42 @@ export class AlienFormation {
   }
 
   private startDive(playerX: number): void {
-    // Pick a random alive alien that isn't already diving
     const candidates = this.aliens.filter(a => a.alive && !a.diving);
     if (candidates.length === 0) return;
 
-    const alien = candidates[Math.floor(Math.random() * candidates.length)];
-    alien.diving = true;
-    alien.divePhase = 0;
-    alien.diveX = alien.x;
-    alien.diveY = alien.y;
-    alien.diveAngle = 0;
-    alien.diveSpeed = randomRange(180, 280);
+    // Decide if this is a group dive (up to 3 aliens)
+    const isGroupDive = Math.random() < this.groupDiveChance;
+    const diveCount = isGroupDive ? Math.min(3, candidates.length) : 1;
 
-    // Bias dive toward player
-    const bias = (playerX - alien.x) * 0.01;
-    alien.diveAngle = bias;
+    // Pick the first diver randomly
+    const first = candidates[Math.floor(Math.random() * candidates.length)];
+    const divers = [first];
+
+    // For group dives, pick neighbors (same row or adjacent)
+    if (diveCount > 1) {
+      const neighbors = candidates.filter(
+        a => a !== first && Math.abs(a.gridRow - first.gridRow) <= 1 &&
+             Math.abs(a.gridCol - first.gridCol) <= 1
+      );
+      for (let i = 0; i < diveCount - 1 && neighbors.length > 0; i++) {
+        const idx = Math.floor(Math.random() * neighbors.length);
+        divers.push(neighbors.splice(idx, 1)[0]);
+      }
+    }
+
+    for (let i = 0; i < divers.length; i++) {
+      const alien = divers[i];
+      alien.diving = true;
+      alien.divePhase = 0;
+      alien.diveX = alien.x;
+      alien.diveY = alien.y;
+      alien.diveAngle = 0;
+      alien.diveSpeed = randomRange(180, 280);
+
+      // Bias dive toward player, stagger group slightly
+      const bias = (playerX - alien.x) * 0.01;
+      alien.diveAngle = bias + i * 0.5;
+    }
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -262,7 +299,67 @@ export class AlienFormation {
     }
 
     ctx.shadowBlur = 0;
+
+    // Damage overlay for armored aliens
+    if (alien.hp < alien.maxHp && alien.hp > 0) {
+      this.renderDamageOverlay(ctx, alien);
+    }
+
+    // Armor pips above armored aliens
+    if (alien.maxHp > 1) {
+      this.renderArmorPips(ctx, alien);
+    }
+
     ctx.restore();
+  }
+
+  private renderDamageOverlay(ctx: CanvasRenderingContext2D, alien: Alien): void {
+    // Crack lines
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(-6, -5);
+    ctx.lineTo(-1, 0);
+    ctx.lineTo(-4, 5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(4, -7);
+    ctx.lineTo(2, -2);
+    ctx.lineTo(6, 3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-2, -3);
+    ctx.lineTo(3, 1);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Sparks
+    const t = alien.animPhase;
+    ctx.fillStyle = '#ffaa44';
+    for (let i = 0; i < 3; i++) {
+      const sx = Math.sin(t * 5 + i * 2.5) * 6;
+      const sy = Math.cos(t * 4 + i * 1.7) * 5;
+      ctx.globalAlpha = 0.3 + Math.sin(t * 8 + i) * 0.3;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private renderArmorPips(ctx: CanvasRenderingContext2D, alien: Alien): void {
+    const pipY = -alien.height / 2 - 5;
+    const totalW = (alien.maxHp - 1) * 6;
+    const startX = -totalW / 2;
+
+    for (let i = 0; i < alien.maxHp; i++) {
+      const filled = i < alien.hp;
+      ctx.fillStyle = filled ? '#ffcc00' : '#333344';
+      ctx.beginPath();
+      ctx.arc(startX + i * 6, pipY, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Row 0 — Commander: Insectoid overlord with crown, mandibles, multi-eyes, energy aura

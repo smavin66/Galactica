@@ -71,7 +71,7 @@ export class Player {
 
   applyPowerUp(type: PowerUpType): void {
     this.powerUp = type;
-    this.powerUpTimer = 10; // 10 seconds
+    this.powerUpTimer = 5; // 5 seconds
     if (type === 'shield') {
       this.shieldHits = 3;
     }
