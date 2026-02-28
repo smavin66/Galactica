@@ -1,0 +1,103 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a1a;
+  color: #e0e0ff;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#launcher {
+  text-align: center;
+  padding: 2rem;
+}
+
+.title {
+  font-size: 4rem;
+  letter-spacing: 0.5em;
+  color: #00ccff;
+  text-shadow: 0 0 20px #00ccff88, 0 0 60px #00ccff44;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: #8888aa;
+  letter-spacing: 0.3em;
+  margin-bottom: 3rem;
+}
+
+.game-cards {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.game-card {
+  background: linear-gradient(135deg, #1a1a3a, #0d0d2a);
+  border: 1px solid #333366;
+  border-radius: 12px;
+  padding: 2rem;
+  width: 280px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  color: #e0e0ff;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.game-card:hover {
+  border-color: #00ccff;
+  box-shadow: 0 0 30px #00ccff44;
+  transform: translateY(-4px);
+}
+
+.card-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.game-card h2 {
+  font-size: 1.2rem;
+  color: #00ccff;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.game-card p {
+  font-size: 0.8rem;
+  color: #8888aa;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.card-action {
+  display: inline-block;
+  padding: 0.4rem 2rem;
+  border: 1px solid #00ccff;
+  border-radius: 4px;
+  color: #00ccff;
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+}
+
+.game-card:hover .card-action {
+  background: #00ccff;
+  color: #0a0a1a;
+}
+
+#game-canvas {
+  border: 1px solid #333366;
+  border-radius: 4px;
+  image-rendering: pixelated;
+}

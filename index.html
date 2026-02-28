@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Galactica</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="launcher">
+      <h1 class="title">GALACTICA</h1>
+      <p class="subtitle">Space Shooter Collection</p>
+      <div class="game-cards">
+        <button class="game-card" id="card-galactic-assault">
+          <div class="card-icon">&#9733;</div>
+          <h2>Galactic Assault</h2>
+          <p>Classic fixed-shooter. Destroy alien formations before they reach you!</p>
+          <span class="card-action">PLAY</span>
+        </button>
+      </div>
+    </div>
+    <canvas id="game-canvas" width="800" height="600" style="display:none;"></canvas>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
