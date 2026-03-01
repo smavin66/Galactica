@@ -1,18 +1,23 @@
-import { CANVAS_W, CANVAS_H } from '../../engine/types';
+import { CANVAS_W, CANVAS_H, Rect } from '../../engine/types';
 import { clamp } from '../../engine/math';
 import { InputManager } from '../../engine/InputManager';
+import { centeredBounds } from './bounds';
+import {
+  PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT, DEFAULT_SHOOT_RATE,
+  RAPID_FIRE_MULTIPLIER, SHIELD_HITS, POWERUP_DURATION, INVULN_DURATION,
+} from './constants';
 
 export type PowerUpType = 'rapid' | 'shield' | 'spread';
 
 export class Player {
   x: number;
   y: number;
-  width = 32;
-  height = 24;
-  speed = 300;
+  width = PLAYER_WIDTH;
+  height = PLAYER_HEIGHT;
+  speed = PLAYER_SPEED;
   lives = 3;
   shootCooldown = 0;
-  shootRate = 0.3; // seconds between shots
+  shootRate = DEFAULT_SHOOT_RATE;
   invulnTime = 0;
   powerUp: PowerUpType | null = null;
   powerUpTimer = 0;
@@ -28,7 +33,7 @@ export class Player {
     this.y = CANVAS_H - 50;
     this.lives = 3;
     this.shootCooldown = 0;
-    this.shootRate = 0.3;
+    this.shootRate = DEFAULT_SHOOT_RATE;
     this.invulnTime = 0;
     this.powerUp = null;
     this.powerUpTimer = 0;
@@ -60,20 +65,24 @@ export class Player {
     }
   }
 
+  bounds(): Rect {
+    return centeredBounds(this.x, this.y, this.width, this.height);
+  }
+
   canShoot(): boolean {
     return this.shootCooldown <= 0;
   }
 
   onShoot(): void {
-    const rate = this.powerUp === 'rapid' ? this.shootRate * 0.4 : this.shootRate;
+    const rate = this.powerUp === 'rapid' ? this.shootRate * RAPID_FIRE_MULTIPLIER : this.shootRate;
     this.shootCooldown = rate;
   }
 
   applyPowerUp(type: PowerUpType): void {
     this.powerUp = type;
-    this.powerUpTimer = 5; // 5 seconds
+    this.powerUpTimer = POWERUP_DURATION;
     if (type === 'shield') {
-      this.shieldHits = 3;
+      this.shieldHits = SHIELD_HITS;
     }
   }
 
@@ -81,6 +90,11 @@ export class Player {
     if (this.powerUp !== 'shield') {
       this.powerUp = null;
     }
+    this.powerUpTimer = 0;
+  }
+
+  clearAllPowerUps(): void {
+    this.powerUp = null;
     this.powerUpTimer = 0;
   }
 
@@ -94,7 +108,7 @@ export class Player {
       return false;
     }
     this.lives--;
-    this.invulnTime = 2;
+    this.invulnTime = INVULN_DURATION;
     return true;
   }
 

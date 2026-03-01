@@ -1,16 +1,21 @@
-import { CANVAS_W } from '../../engine/types';
+import { CANVAS_W, Rect } from '../../engine/types';
 import { randomRange } from '../../engine/math';
+import {
+  MYSTERY_SHIP_Y, MYSTERY_SHIP_WIDTH, MYSTERY_SHIP_HEIGHT,
+  MYSTERY_SHIP_SPAWN_MIN, MYSTERY_SHIP_SPAWN_MAX,
+  MYSTERY_SHIP_SPEED_MIN, MYSTERY_SHIP_SPEED_MAX, MYSTERY_SHIP_POINTS,
+} from './constants';
 
 export class MysteryShip {
   x = 0;
-  y = 32;
-  width = 40;
-  height = 18;
+  y = MYSTERY_SHIP_Y;
+  width = MYSTERY_SHIP_WIDTH;
+  height = MYSTERY_SHIP_HEIGHT;
   active = false;
-  direction = 1; // 1 = left-to-right, -1 = right-to-left
-  speed = 0;
-  points = 0;
-  spawnTimer = 0;
+  private direction = 1;
+  private speed = 0;
+  private points = 0;
+  private spawnTimer = 0;
   private animPhase = 0;
 
   constructor() {
@@ -23,15 +28,15 @@ export class MysteryShip {
   }
 
   private resetTimer(): void {
-    this.spawnTimer = randomRange(18, 30);
+    this.spawnTimer = randomRange(MYSTERY_SHIP_SPAWN_MIN, MYSTERY_SHIP_SPAWN_MAX);
   }
 
   private spawn(): void {
     this.active = true;
     this.direction = Math.random() < 0.5 ? 1 : -1;
     this.x = this.direction === 1 ? -this.width : CANVAS_W + this.width;
-    this.speed = randomRange(120, 180);
-    this.points = [200, 300, 500][Math.floor(Math.random() * 3)];
+    this.speed = randomRange(MYSTERY_SHIP_SPEED_MIN, MYSTERY_SHIP_SPEED_MAX);
+    this.points = MYSTERY_SHIP_POINTS[Math.floor(Math.random() * MYSTERY_SHIP_POINTS.length)];
     this.animPhase = 0;
   }
 
@@ -55,6 +60,10 @@ export class MysteryShip {
       this.active = false;
       this.resetTimer();
     }
+  }
+
+  bounds(): Rect {
+    return { x: this.x - this.width / 2, y: this.y - this.height / 2, w: this.width, h: this.height };
   }
 
   hit(): number {

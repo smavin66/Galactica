@@ -1,5 +1,6 @@
 import { ObjectPool } from '../../engine/ObjectPool';
 import { CANVAS_H } from '../../engine/types';
+import { PLAYER_BULLET_SPEED, BULLET_OFF_SCREEN_MARGIN } from './constants';
 
 export interface Bullet {
   x: number;
@@ -24,7 +25,7 @@ export class BulletManager {
     this.alienBullets = new ObjectPool<Bullet>(100, createBullet);
   }
 
-  spawnPlayerBullet(x: number, y: number, vx = 0, vy = -500): void {
+  spawnPlayerBullet(x: number, y: number, vx = 0, vy = PLAYER_BULLET_SPEED): void {
     const b = this.playerBullets.acquire();
     if (b) {
       b.x = x;
@@ -55,13 +56,13 @@ export class BulletManager {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
     });
-    this.playerBullets.releaseIf((b) => b.y < -20 || b.y > CANVAS_H + 20);
+    this.playerBullets.releaseIf((b) => b.y < -BULLET_OFF_SCREEN_MARGIN || b.y > CANVAS_H + BULLET_OFF_SCREEN_MARGIN);
 
     this.alienBullets.forEachActive((b) => {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
     });
-    this.alienBullets.releaseIf((b) => b.y < -20 || b.y > CANVAS_H + 20);
+    this.alienBullets.releaseIf((b) => b.y < -BULLET_OFF_SCREEN_MARGIN || b.y > CANVAS_H + BULLET_OFF_SCREEN_MARGIN);
   }
 
   render(ctx: CanvasRenderingContext2D): void {

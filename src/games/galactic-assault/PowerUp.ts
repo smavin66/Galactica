@@ -1,6 +1,7 @@
 import { ObjectPool } from '../../engine/ObjectPool';
 import { CANVAS_H } from '../../engine/types';
 import { PowerUpType } from './Player';
+import { POWERUP_SPAWN_CHANCE, POWERUP_FALL_SPEED, POWERUP_SIZE, BULLET_OFF_SCREEN_MARGIN } from './constants';
 
 export interface PowerUpItem {
   x: number;
@@ -26,11 +27,11 @@ const POWER_UP_LABELS: Record<PowerUpType, string> = {
 const TYPES: PowerUpType[] = ['rapid', 'shield', 'spread'];
 
 function createPowerUp(): PowerUpItem {
-  return { x: 0, y: 0, type: 'rapid', vy: 0, size: 14, bobPhase: 0 };
+  return { x: 0, y: 0, type: 'rapid', vy: 0, size: POWERUP_SIZE, bobPhase: 0 };
 }
 
 export class PowerUpManager {
-  pool: ObjectPool<PowerUpItem>;
+  private pool: ObjectPool<PowerUpItem>;
 
   constructor() {
     this.pool = new ObjectPool<PowerUpItem>(10, createPowerUp);
@@ -38,7 +39,7 @@ export class PowerUpManager {
 
   spawn(x: number, y: number): void {
     // 25% chance to spawn a power-up
-    if (Math.random() > 0.25) return;
+    if (Math.random() > POWERUP_SPAWN_CHANCE) return;
 
     const item = this.pool.acquire();
     if (!item) return;
@@ -46,8 +47,8 @@ export class PowerUpManager {
     item.x = x;
     item.y = y;
     item.type = TYPES[Math.floor(Math.random() * TYPES.length)];
-    item.vy = 80;
-    item.size = 14;
+    item.vy = POWERUP_FALL_SPEED;
+    item.size = POWERUP_SIZE;
     item.bobPhase = Math.random() * Math.PI * 2;
   }
 
@@ -56,7 +57,7 @@ export class PowerUpManager {
       p.y += p.vy * dt;
       p.bobPhase += dt * 4;
     });
-    this.pool.releaseIf((p) => p.y > CANVAS_H + 20);
+    this.pool.releaseIf((p) => p.y > CANVAS_H + BULLET_OFF_SCREEN_MARGIN);
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -91,6 +92,14 @@ export class PowerUpManager {
 
       ctx.restore();
     });
+  }
+
+  forEachActive(fn: (item: PowerUpItem) => void): void {
+    this.pool.forEachActive(fn);
+  }
+
+  release(item: PowerUpItem): void {
+    this.pool.release(item);
   }
 
   reset(): void {

@@ -11,6 +11,8 @@ import { BulletManager } from './Bullets';
 import { AlienFormation } from './AlienFormation';
 import { PowerUpManager } from './PowerUp';
 import { MysteryShip } from './MysteryShip';
+import { alienBounds, bulletBounds, powerUpBounds } from './bounds';
+import { DYING_DURATION } from './constants';
 
 type GameState = 'ready' | 'playing' | 'dying' | 'gameover' | 'nextwave';
 
@@ -66,8 +68,7 @@ export class GalacticAssault implements Game {
     this.powerUps.reset();
     this.mysteryShip.reset();
     this.particles.clear();
-    this.player.powerUp = null;
-    this.player.powerUpTimer = 0;
+    this.player.clearAllPowerUps();
   }
 
   update(dt: number): void {
@@ -164,31 +165,13 @@ export class GalacticAssault implements Game {
   }
 
   private checkCollisions(): void {
-    const pw = this.player.width;
-    const ph = this.player.height;
-    const playerRect = {
-      x: this.player.x - pw / 2,
-      y: this.player.y - ph / 2,
-      w: pw,
-      h: ph,
-    };
+    const playerRect = this.player.bounds();
 
     // Player bullets vs mystery ship
     if (this.mysteryShip.active) {
-      const shipRect = {
-        x: this.mysteryShip.x - this.mysteryShip.width / 2,
-        y: this.mysteryShip.y - this.mysteryShip.height / 2,
-        w: this.mysteryShip.width,
-        h: this.mysteryShip.height,
-      };
+      const shipRect = this.mysteryShip.bounds();
       this.bullets.playerBullets.forEachActive((bullet) => {
-        const bRect = {
-          x: bullet.x - bullet.width / 2,
-          y: bullet.y - bullet.height / 2,
-          w: bullet.width,
-          h: bullet.height,
-        };
-        if (rectOverlap(bRect, shipRect)) {
+        if (rectOverlap(bulletBounds(bullet), shipRect)) {
           this.bullets.playerBullets.release(bullet);
           const pts = this.mysteryShip.hit();
           this.score += pts;
@@ -203,29 +186,15 @@ export class GalacticAssault implements Game {
 
     // Player bullets vs aliens
     this.bullets.playerBullets.forEachActive((bullet) => {
-      const bulletRect = {
-        x: bullet.x - bullet.width / 2,
-        y: bullet.y - bullet.height / 2,
-        w: bullet.width,
-        h: bullet.height,
-      };
-
+      const bRect = bulletBounds(bullet);
       for (const alien of this.aliens.aliens) {
         if (!alien.alive) continue;
-        const alienRect = {
-          x: alien.x - alien.width / 2,
-          y: alien.y - alien.height / 2,
-          w: alien.width,
-          h: alien.height,
-        };
-
-        if (rectOverlap(bulletRect, alienRect)) {
+        if (rectOverlap(bRect, alienBounds(alien))) {
           this.bullets.playerBullets.release(bullet);
           alien.hp--;
           alien.hitFlash = 0.15;
 
           if (alien.hp <= 0) {
-            // Destroyed
             alien.alive = false;
             alien.diving = false;
             this.score += this.aliens.getPointsForAlien(alien);
@@ -238,7 +207,6 @@ export class GalacticAssault implements Game {
             this.shake.trigger(3, 0.15);
             this.powerUps.spawn(alien.x, alien.y);
           } else {
-            // Damaged but alive
             this.particles.emit(alien.x, alien.y, 6, '#ffaa44', 60, 0.2, 2);
             this.audio.hit();
             this.shake.trigger(2, 0.1);
@@ -250,14 +218,8 @@ export class GalacticAssault implements Game {
 
     // Alien bullets vs player
     this.bullets.alienBullets.forEachActive((bullet) => {
-      const bulletRect = {
-        x: bullet.x - bullet.width,
-        y: bullet.y - bullet.height,
-        w: bullet.width * 2,
-        h: bullet.height * 2,
-      };
-
-      if (rectOverlap(bulletRect, playerRect)) {
+      const bRect = bulletBounds(bullet);
+      if (rectOverlap(bRect, playerRect)) {
         this.bullets.alienBullets.release(bullet);
         this.handlePlayerHit();
       }
@@ -266,13 +228,7 @@ export class GalacticAssault implements Game {
     // Diving aliens vs player
     for (const alien of this.aliens.aliens) {
       if (!alien.alive || !alien.diving) continue;
-      const alienRect = {
-        x: alien.x - alien.width / 2,
-        y: alien.y - alien.height / 2,
-        w: alien.width,
-        h: alien.height,
-      };
-      if (rectOverlap(alienRect, playerRect)) {
+      if (rectOverlap(alienBounds(alien), playerRect)) {
         alien.alive = false;
         this.particles.emit(alien.x, alien.y, 20, '#ff4444', 200, 0.5, 5);
         this.handlePlayerHit();
@@ -280,15 +236,9 @@ export class GalacticAssault implements Game {
     }
 
     // Power-ups vs player
-    this.powerUps.pool.forEachActive((p) => {
-      const pRect = {
-        x: p.x - p.size,
-        y: p.y - p.size,
-        w: p.size * 2,
-        h: p.size * 2,
-      };
-      if (rectOverlap(pRect, playerRect)) {
-        this.powerUps.pool.release(p);
+    this.powerUps.forEachActive((p) => {
+      if (rectOverlap(powerUpBounds(p), playerRect)) {
+        this.powerUps.release(p);
         this.player.applyPowerUp(p.type);
         this.audio.powerup();
         this.particles.emit(p.x, p.y, 10, '#ffffff', 60, 0.3, 2);
@@ -303,7 +253,7 @@ export class GalacticAssault implements Game {
       this.shake.trigger(8, 0.3);
       this.particles.emit(this.player.x, this.player.y, 20, '#00ccff', 150, 0.5, 4);
       this.state = 'dying';
-      this.dyingTimer = 1.5;
+      this.dyingTimer = DYING_DURATION;
     } else {
       // Shield absorbed
       this.audio.hit();
